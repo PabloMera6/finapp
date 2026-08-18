@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-finapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?debes definir POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-finapp}
+    volumes:
+      - finapp_pgdata:/var/lib/postgresql/data
+    # IMPORTANTE: PostgreSQL NO expone puertos al host. Solo accesible
+    # dentro de la red privada de Docker (finapp_internal).
+    networks:
+      - finapp_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finapp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-finapp}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-finapp}
+      SECRET_KEY: ${SECRET_KEY:?debes definir SECRET_KEY en .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?debes definir ADMIN_PASSWORD en .env}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    networks:
+      - finapp_internal
+      - finapp_public
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - finapp_public
+
+networks:
+  finapp_internal:
+    internal: true   # sin salida a Internet ni acceso desde el host
+  finapp_public:
+
+volumes:
+  finapp_pgdata:

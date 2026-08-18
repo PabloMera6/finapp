@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap");
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #F5F6F2;
+  color: #151A17;
+  font-family: "Inter", sans-serif;
+}
+
+h1, h2, h3, .font-display {
+  font-family: "Sora", sans-serif;
+}
+
+.card {
+  background: #FFFFFF;
+  border: 1px solid #E3E6DE;
+  border-radius: 14px;
+}
+
+.pill-positive {
+  background: #DCEAE4;
+  color: #245A4C;
+}
+
+.pill-negative {
+  background: #F6E4DF;
+  color: #B94A34;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #D7DBD1;
+  border-radius: 8px;
+}
