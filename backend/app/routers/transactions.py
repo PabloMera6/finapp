@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,6 +16,24 @@ from app.services.categorizer import learn_rule_from_correction
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
 
+@router.get("/institutions")
+def list_institutions(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Entidades (fuentes) distintas con movimientos, para poblar el filtro."""
+    rows = (
+        db.query(Transaction.source)
+        .join(Account, Transaction.account_id == Account.id)
+        .filter(Account.user_id == user.id)
+        .filter(Transaction.source.isnot(None))
+        .distinct()
+        .order_by(Transaction.source)
+        .all()
+    )
+    return {"institutions": [r[0] for r in rows if r[0]]}
+
+
 @router.get("")
 def list_transactions(
     db: Session = Depends(get_db),
@@ -26,7 +45,9 @@ def list_transactions(
     category_id: Optional[str] = None,
     tx_type: Optional[str] = None,
     search: Optional[str] = None,
-    limit: int = Query(default=100, le=500),
+    amount_min: Optional[float] = None,
+    amount_max: Optional[float] = None,
+    limit: int = Query(default=100, le=5000),
     offset: int = 0,
 ):
     q = db.query(Transaction).join(Account, Transaction.account_id == Account.id).filter(Account.user_id == user.id)
@@ -46,6 +67,13 @@ def list_transactions(
     if search:
         like = f"%{search}%"
         q = q.filter(Transaction.description.ilike(like))
+    # Filtro por importe: se compara sobre el valor absoluto, así el
+    # usuario puede filtrar "entre 10 y 50 €" sin preocuparse de si el
+    # movimiento es un gasto (negativo) o un ingreso (positivo).
+    if amount_min is not None:
+        q = q.filter(func.abs(Transaction.amount) >= amount_min)
+    if amount_max is not None:
+        q = q.filter(func.abs(Transaction.amount) <= amount_max)
 
     total = q.count()
     rows = q.order_by(Transaction.date.desc()).offset(offset).limit(limit).all()

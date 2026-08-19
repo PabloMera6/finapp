@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import io
 import re
+import logging;
 from datetime import datetime
 from decimal import Decimal
 
@@ -92,6 +93,7 @@ DATE_NUMERIC_RE = re.compile(
     r"(?<!\d)(\d{1,2})[./-](\d{1,2})[./-](\d{4})(?!\d)"
 )
 
+logger = logging.getLogger(__name__)
 
 def _parse_trade_republic_date(raw: str) -> datetime | None:
     """
@@ -180,25 +182,25 @@ YEAR_ONLY_RE = re.compile(
 )
 
 
-def _merge_wrapped_date_lines(lines: list[str]) -> list[str]:
+def _merge_wrapped_date_lines(
+    lines: list[str],
+) -> list[str]:
     """
-    Reconstruye fechas que el extractor del PDF haya partido en dos líneas.
+    Normaliza fechas de Trade Republic.
 
-    Ejemplo:
+    El extractor de PDF puede producir varios formatos:
 
         16 sept
+        2025 Transferencia ...
+
+    o:
+
+        27 sept
         2025
+        Transacción con
+        tarjeta ...
 
-    se convierte en:
-
-        16 sept 2025
-
-    También soporta:
-
-        16 septiembre
-        2025
-
-    Las demás líneas permanecen intactas.
+    Ambos deben terminar representando la misma fecha completa.
     """
 
     result: list[str] = []
@@ -209,12 +211,76 @@ def _merge_wrapped_date_lines(lines: list[str]) -> list[str]:
 
         current = _clean_pdf_line(lines[i])
 
+        if not current:
+            i += 1
+            continue
+
+        # ---------------------------------------------------------
+        # Caso:
+        #
+        #   16 sept
+        #   2025 Transferencia ...
+        #
+        # El año y el contenido de la operación están en la
+        # siguiente línea.
+        # ---------------------------------------------------------
+
+        partial_match = PARTIAL_TEXT_DATE_RE.match(
+            current
+        )
+
+        if partial_match and i + 1 < len(lines):
+
+            next_line = _clean_pdf_line(
+                lines[i + 1]
+            )
+
+            year_match = re.match(
+                r"^(?P<year>\d{4})\b",
+                next_line,
+            )
+
+            if year_match:
+
+                year = year_match.group(
+                    "year"
+                )
+
+                remainder = _clean_pdf_line(
+                    next_line[year_match.end():]
+                )
+
+                merged = _clean_pdf_line(
+                    f"{current} {year} {remainder}"
+                )
+
+                result.append(merged)
+
+                i += 2
+                continue
+
+        # ---------------------------------------------------------
+        # Caso:
+        #
+        #   27 sept
+        #   2025
+        #   Transacción con
+        #   tarjeta ...
+        #
+        # Solo fusionamos aquí la fecha. Las líneas siguientes
+        # permanecen como contenido de la operación.
+        # ---------------------------------------------------------
+
         if (
-            i + 1 < len(lines)
-            and PARTIAL_TEXT_DATE_RE.match(current)
-            and YEAR_ONLY_RE.match(lines[i + 1])
+            partial_match
+            and i + 1 < len(lines)
+            and YEAR_ONLY_RE.match(
+                _clean_pdf_line(lines[i + 1])
+            )
         ):
-            year = _clean_pdf_line(lines[i + 1])
+            year = _clean_pdf_line(
+                lines[i + 1]
+            )
 
             result.append(
                 _clean_pdf_line(
@@ -225,9 +291,183 @@ def _merge_wrapped_date_lines(lines: list[str]) -> list[str]:
             i += 2
             continue
 
+        # ---------------------------------------------------------
+        # Línea normal.
+        # ---------------------------------------------------------
+
         result.append(current)
 
         i += 1
+
+    return result
+# ---------------------------------------------------------------------------
+# NUEVO:
+# Separación de fechas incrustadas
+# ---------------------------------------------------------------------------
+
+def _find_all_trade_republic_date_spans(
+    line: str,
+) -> list[tuple[int, int]]:
+    """
+    Devuelve todas las posiciones de fechas encontradas en una línea.
+
+    Es necesario porque la extracción de determinados PDFs de Trade Republic
+    puede devolver varias transacciones físicas en una única línea, por
+    ejemplo:
+
+        05 jul 2026 Compra 20,00 € 1.914,10 € 06 jul 2026 Transferencia
+        500,00 € 2.414,10 €
+
+    En ese caso ambas fechas deben convertirse en separadores de
+    transacciones.
+
+    Se combinan las fechas textuales y numéricas evitando duplicados.
+    """
+
+    spans: list[tuple[int, int]] = []
+
+    for regex in (
+        DATE_TEXT_RE,
+        DATE_NUMERIC_RE,
+    ):
+        for match in regex.finditer(line):
+            spans.append(
+                (
+                    match.start(),
+                    match.end(),
+                )
+            )
+
+    if not spans:
+        return []
+
+    # Ordenar por posición.
+    spans.sort(key=lambda item: (item[0], item[1]))
+
+    # Eliminar solapamientos.
+    result: list[tuple[int, int]] = []
+
+    for start, end in spans:
+
+        if not result:
+            result.append((start, end))
+            continue
+
+        previous_start, previous_end = result[-1]
+
+        if start < previous_end:
+            # Si se solapan, conservar el span más largo.
+            if end > previous_end:
+                result[-1] = (
+                    previous_start,
+                    end,
+                )
+            continue
+
+        result.append((start, end))
+
+    return result
+
+
+def _split_lines_on_embedded_dates(
+    lines: list[str],
+) -> list[str]:
+    """
+    Divide líneas que contienen varias fechas.
+
+    El extractor de PDF puede devolver algo parecido a:
+
+        05 jul 2026 Gasto A 20,00 € 1.914,10 € 06 jul 2026
+        Ingreso B 500,00 € 2.414,10 €
+
+    El parser original trataba todo eso como una única transacción.
+
+    Esta función lo convierte en:
+
+        05 jul 2026 Gasto A 20,00 € 1.914,10 €
+        06 jul 2026 Ingreso B 500,00 € 2.414,10 €
+
+    También funciona si aparecen 3 o más fechas en la misma línea.
+    """
+
+    result: list[str] = []
+
+    for original_line in lines:
+
+        line = _clean_pdf_line(original_line)
+
+        if not line:
+            continue
+
+        spans = _find_all_trade_republic_date_spans(
+            line
+        )
+
+        if not spans:
+            result.append(line)
+            continue
+
+        # ---------------------------------------------------------------
+        # Si solo hay una fecha:
+        #
+        # Si está al principio, la línea ya está correctamente formada.
+        #
+        # Si está en medio, significa que hay contenido perteneciente
+        # a una transacción anterior seguido de una nueva transacción.
+        # ---------------------------------------------------------------
+
+        if len(spans) == 1:
+
+            start, end = spans[0]
+
+            prefix = _clean_pdf_line(
+                line[:start]
+            )
+
+            suffix = _clean_pdf_line(
+                line[start:]
+            )
+
+            if prefix:
+                result.append(prefix)
+
+            if suffix:
+                result.append(suffix)
+
+            continue
+
+        # ---------------------------------------------------------------
+        # Hay varias fechas en la misma línea.
+        #
+        # Cada fecha inicia una nueva transacción.
+        # Conservamos todo el contenido entre una fecha y la siguiente
+        # dentro del segmento correspondiente.
+        # ---------------------------------------------------------------
+
+        first_start, _ = spans[0]
+
+        # Puede existir contenido anterior a la primera fecha.
+        prefix = _clean_pdf_line(
+            line[:first_start]
+        )
+
+        if prefix:
+            result.append(prefix)
+
+        for index, (start, _) in enumerate(spans):
+
+            if index + 1 < len(spans):
+                next_start = spans[index + 1][0]
+                segment = line[start:next_start]
+            else:
+                segment = line[start:]
+
+            segment = _clean_pdf_line(
+                segment
+            )
+
+            if segment:
+                result.append(segment)
 
     return result
 
@@ -396,16 +636,6 @@ MONEY_RE = re.compile(
 
 
 def _is_money_line(line: str) -> bool:
-    """
-    Detecta importes del estilo:
-
-        10,00 €
-        10 €
-        -10,50 €
-        1.234,56 €
-        +10,00 €
-    """
-
     line = _clean_pdf_line(line)
 
     return bool(
@@ -424,19 +654,6 @@ def _parse_money_line(line: str) -> Decimal | None:
 
 
 def _extract_money_values(text: str) -> list[Decimal]:
-    """
-    Extrae todos los importes que aparezcan en un texto.
-
-    Esto permite procesar tanto:
-
-        10,00 €
-
-    como:
-
-        10,00 € 10,00 €
-
-    """
-
     values: list[Decimal] = []
 
     for match in MONEY_RE.finditer(text):
@@ -470,10 +687,6 @@ def _find_transaction_section(text: str) -> str:
         .replace("\r", "\n")
     )
 
-    # ---------------------------------------------------------------
-    # Buscar inicio
-    # ---------------------------------------------------------------
-
     start_match = re.search(
         r"TRANSACCIONES\s+DE\s+CUENTA",
         normalized,
@@ -484,10 +697,6 @@ def _find_transaction_section(text: str) -> str:
         return ""
 
     section = normalized[start_match.end():]
-
-    # ---------------------------------------------------------------
-    # Buscar final
-    # ---------------------------------------------------------------
 
     end_pattern = re.compile(
         r"""
@@ -541,149 +750,235 @@ def _looks_like_header(line: str) -> bool:
 # ---------------------------------------------------------------------------
 # Extracción de fecha desde una línea
 # ---------------------------------------------------------------------------
+def _extract_transaction_start_date(
+        line: str,
+    ) -> tuple[datetime | None, str]:
+        """
+        Extrae una fecha únicamente cuando aparece al comienzo
+        de la línea.
 
-def _extract_date_from_line(
-    line: str,
-) -> tuple[datetime | None, str]:
-    """
-    Busca una fecha dentro de la línea.
+        Esto es importante porque una descripción puede contener
+        una fecha que NO representa una nueva operación.
+        """
 
-    Devuelve:
+        value = _clean_pdf_line(line)
 
-        (fecha, texto_sin_fecha)
+        if not value:
+            return None, ""
 
-    Soporta:
+        match = DATE_TEXT_RE.match(value)
 
-        16 sept 2025
-        16 sept 2025 Transferencia
-        16/09/2025 Transferencia
-    """
+        if match:
+            date = _parse_trade_republic_date(
+                match.group(0)
+            )
 
-    match = DATE_TEXT_RE.search(line)
+            remaining = value[match.end():]
 
-    if match:
-        date = _parse_trade_republic_date(
-            match.group(0)
-        )
+            return date, _clean_pdf_line(
+                remaining
+            )
 
-        remaining = (
-            line[:match.start()]
-            + " "
-            + line[match.end():]
-        )
+        match = DATE_NUMERIC_RE.match(value)
 
-        return date, _clean_pdf_line(
-            remaining
-        )
+        if match:
+            date = _parse_trade_republic_date(
+                match.group(0)
+            )
 
-    match = DATE_NUMERIC_RE.search(line)
+            remaining = value[match.end():]
 
-    if match:
-        date = _parse_trade_republic_date(
-            match.group(0)
-        )
+            return date, _clean_pdf_line(
+                remaining
+            )
 
-        remaining = (
-            line[:match.start()]
-            + " "
-            + line[match.end():]
-        )
-
-        return date, _clean_pdf_line(
-            remaining
-        )
-
-    return None, line
-
-
+        return None, value
 
 # ---------------------------------------------------------------------------
 # Resolución de signo mediante columna BALANCE
 # ---------------------------------------------------------------------------
 
-def _resolve_trade_republic_amounts(candidates: list[dict]) -> list[Decimal]:
+def _resolve_trade_republic_amounts(
+    candidates: list[dict],
+) -> list[Decimal]:
     """
     Trade Republic exporta dos columnas monetarias:
-      ENTRADA DE DINERO | SALIDA DE DINERO | BALANCE
 
-    El PDF, sin embargo, puede extraer ambas entradas/salidas como importes
-    positivos. Por ello el primer importe NO determina por sí solo el signo.
+        ENTRADA DE DINERO | SALIDA DE DINERO | BALANCE
 
-    Usamos el balance acumulado como fuente de verdad:
+    El PDF puede extraer las entradas/salidas como importes positivos.
+
+    El balance acumulado permite determinar el signo real:
+
         balance_actual - balance_anterior = movimiento
-
-    Para la primera fila, si no conocemos el balance anterior, buscamos una
-    fila posterior cuyo balance permita validar el signo. Si no es posible,
-    conservamos el signo explícito del PDF o, en último caso, el positivo.
     """
+
     if not candidates:
         return []
 
-    balances = [c.get("balance") for c in candidates]
-    raw = [c["movement"] for c in candidates]
+    balances = [
+        c.get("balance")
+        for c in candidates
+    ]
+
+    raw = [
+        c["movement"]
+        for c in candidates
+    ]
+
     result: list[Decimal] = []
 
-    # Inferir el signo fila a fila usando balances consecutivos.
     for idx, c in enumerate(candidates):
-        movement = abs(c["movement"])
-        balance = c.get("balance")
-        previous_balance = balances[idx - 1] if idx > 0 else None
 
-        if idx > 0 and previous_balance is not None and balance is not None:
-            delta = balance - previous_balance
-            # Si coincide con el importe de movimiento, es inequívoco.
+        movement = abs(c["movement"])
+
+        balance = c.get("balance")
+
+        previous_balance = (
+            balances[idx - 1]
+            if idx > 0
+            else None
+        )
+
+        # ---------------------------------------------------------------
+        # Caso normal:
+        #
+        # balance actual - balance anterior
+        # determina inequívocamente el movimiento.
+        # ---------------------------------------------------------------
+
+        if (
+            idx > 0
+            and previous_balance is not None
+            and balance is not None
+        ):
+            delta = (
+                balance
+                - previous_balance
+            )
+
             if abs(delta) == movement:
                 result.append(delta)
                 continue
 
-        # Primera fila: usar la siguiente fila como ancla.
+        # ---------------------------------------------------------------
+        # Primera fila.
+        # ---------------------------------------------------------------
+
         if idx == 0 and balance is not None:
+
             hint_type = c.get("type")
-            if hint_type in {"EXPENSE", "INVESTMENT_BUY", "FEE"}:
+
+            if hint_type in {
+                "EXPENSE",
+                "INVESTMENT_BUY",
+                "FEE",
+            }:
                 result.append(-movement)
                 continue
-            if hint_type in {"INCOME", "INVESTMENT_SELL", "DIVIDEND", "INTEREST"}:
+
+            if hint_type in {
+                "INCOME",
+                "INVESTMENT_SELL",
+                "DIVIDEND",
+                "INTEREST",
+            }:
                 result.append(movement)
                 continue
-            if DEPOSIT_RE.search(c.get("raw_text", "")):
+
+            if DEPOSIT_RE.search(
+                c.get("raw_text", "")
+            ):
                 result.append(movement)
                 continue
-            if WITHDRAWAL_RE.search(c.get("raw_text", "")):
+
+            if WITHDRAWAL_RE.search(
+                c.get("raw_text", "")
+            ):
                 result.append(-movement)
                 continue
+
+            # -----------------------------------------------------------
+            # Intento de inferir el signo de la primera operación
+            # usando una fila posterior.
+            # -----------------------------------------------------------
+
             for j in range(1, len(candidates)):
+
                 next_balance = balances[j]
+
                 if next_balance is None:
                     continue
-                # Si conocemos la suma de movimientos intermedios no podemos
-                # asumir todos iguales, pero la siguiente fila suele bastar.
-                delta_next = next_balance - balance
-                next_movement = abs(raw[j])
+
+                delta_next = (
+                    next_balance
+                    - balance
+                )
+
+                next_movement = abs(
+                    raw[j]
+                )
+
                 if abs(delta_next) == next_movement:
-                    # No revela directamente el signo de la primera fila;
-                    # usar el balance previo implícito de la primera operación
-                    # cuando el siguiente movimiento sí cuadra.
-                    implied_previous = balance - abs(raw[idx])
+
+                    implied_previous = (
+                        balance
+                        - abs(raw[idx])
+                    )
+
                     if implied_previous >= 0:
-                        result.append(abs(raw[idx]))
+                        result.append(
+                            abs(raw[idx])
+                        )
                     else:
-                        result.append(-abs(raw[idx]))
+                        result.append(
+                            -abs(raw[idx])
+                        )
+
                     break
+
             else:
-                result.append(c["explicit_amount"])
+                result.append(
+                    c["explicit_amount"]
+                )
+
             continue
 
+        # ---------------------------------------------------------------
+        # Fallback.
+        # ---------------------------------------------------------------
+
         hint_type = c.get("type")
-        if hint_type in {"EXPENSE", "INVESTMENT_BUY", "FEE"}:
+
+        if hint_type in {
+            "EXPENSE",
+            "INVESTMENT_BUY",
+            "FEE",
+        }:
             result.append(-movement)
-        elif hint_type in {"INCOME", "INVESTMENT_SELL", "DIVIDEND", "INTEREST"}:
+
+        elif hint_type in {
+            "INCOME",
+            "INVESTMENT_SELL",
+            "DIVIDEND",
+            "INTEREST",
+        }:
             result.append(movement)
-        elif DEPOSIT_RE.search(c.get("raw_text", "")):
+
+        elif DEPOSIT_RE.search(
+            c.get("raw_text", "")
+        ):
             result.append(movement)
-        elif WITHDRAWAL_RE.search(c.get("raw_text", "")):
+
+        elif WITHDRAWAL_RE.search(
+            c.get("raw_text", "")
+        ):
             result.append(-movement)
+
         else:
-            result.append(c["explicit_amount"])
+            result.append(
+                c["explicit_amount"]
+            )
 
     return result
 
@@ -749,13 +1044,17 @@ class TradeRepublicParser(BankParser):
     ) -> ParseResult:
 
         errors: list[ParseError] = []
-        transactions: list[NormalizedTransaction] = []
+
+        transactions: list[
+            NormalizedTransaction
+        ] = []
 
         # ---------------------------------------------------------------
         # Validación de fichero
         # ---------------------------------------------------------------
 
         if not filename.lower().endswith(".pdf"):
+
             errors.append(
                 ParseError(
                     0,
@@ -775,11 +1074,17 @@ class TradeRepublicParser(BankParser):
         # ---------------------------------------------------------------
 
         try:
+
             text = _extract_pdf_text(
                 file_bytes
             )
+            logger.warning(
+                "TR_DEBUG PDF_TEXT_BEGIN\n%s\nTR_DEBUG PDF_TEXT_END",
+                text[:30000],
+            )
 
         except Exception as exc:
+
             return ParseResult(
                 self.institution_key,
                 [],
@@ -805,6 +1110,7 @@ class TradeRepublicParser(BankParser):
         )
 
         if not section.strip():
+
             return ParseResult(
                 self.institution_key,
                 [],
@@ -836,25 +1142,66 @@ class TradeRepublicParser(BankParser):
             if line
         ]
 
+        logger.warning(
+            "TR_DEBUG RAW_LINES count=%d",
+            len(raw_lines),
+        )
+
+        for idx, line in enumerate(raw_lines):
+            logger.warning(
+                "TR_DEBUG RAW[%03d] %r",
+                idx,
+                line,
+            )
+
         # ---------------------------------------------------------------
-        # IMPORTANTE:
-        #
-        # El extractor del PDF puede devolver:
-        #
-        #     16 sept
-        #     2025
-        #
-        # en lugar de:
-        #
-        #     16 sept 2025
-        #
-        # Reconstruimos la fecha antes de procesar
-        # las transacciones.
+        # Reconstruir fechas partidas
         # ---------------------------------------------------------------
 
         lines = _merge_wrapped_date_lines(
             raw_lines
         )
+        logger.warning(
+            "TR_DEBUG AFTER_MERGE count=%d",
+            len(lines),
+        )
+
+        for idx, line in enumerate(lines):
+            logger.warning(
+                "TR_DEBUG MERGE[%03d] %r",
+                idx,
+                line,
+            )
+
+        # ---------------------------------------------------------------
+        # IMPORTANTE:
+        #
+        # El extractor PDF puede colocar varias transacciones en una
+        # única línea física.
+        #
+        # Ejemplo:
+        #
+        # 05 jul 2026 Gasto A 20,00 € 1.914,10 € 06 jul 2026
+        # Ingreso B 500,00 € 2.414,10 €
+        #
+        # Hay que separar la segunda fecha antes de construir los
+        # bloques de transacciones.
+        # ---------------------------------------------------------------
+
+        lines = _split_lines_on_embedded_dates(
+            lines
+        )
+        logger.warning(
+            "TR_DEBUG AFTER_SPLIT count=%d",
+            len(lines),
+        )
+
+        for idx, line in enumerate(lines):
+            logger.warning(
+                "TR_DEBUG SPLIT[%03d] %r",
+                idx,
+                line,
+            )
 
         # ---------------------------------------------------------------
         # Eliminar cabeceras
@@ -871,7 +1218,9 @@ class TradeRepublicParser(BankParser):
         # ---------------------------------------------------------------
 
         i = 0
+
         parsed_rows = 0
+
         candidates: list[dict] = []
 
         while i < len(lines):
@@ -883,7 +1232,7 @@ class TradeRepublicParser(BankParser):
             # -----------------------------------------------------------
 
             date_val, remainder = (
-                _extract_date_from_line(line)
+                _extract_transaction_start_date(line)
             )
 
             if date_val is None:
@@ -893,26 +1242,32 @@ class TradeRepublicParser(BankParser):
             parsed_rows += 1
 
             block_start = i + 1
+
             j = block_start
 
             # -----------------------------------------------------------
-            # Buscar fin del bloque:
+            # Buscar fin del bloque.
             #
-            # una nueva fecha significa una nueva transacción.
+            # Gracias a _split_lines_on_embedded_dates(), cada nueva
+            # transacción debería empezar ahora en una línea independiente.
             # -----------------------------------------------------------
 
             while j < len(lines):
 
                 next_date, _ = (
-                    _extract_date_from_line(
+                    _extract_transaction_start_date(
                         lines[j]
                     )
                 )
 
-                if (
-                    j > block_start
-                    and next_date is not None
-                ):
+                # Cada línea que comienza/contiene una nueva fecha de operación
+                # marca el comienzo de una nueva transacción.
+                #
+                # Es importante NO exigir j > block_start:
+                # dos operaciones consecutivas pueden tener exactamente la misma
+                # fecha y la segunda fecha puede estar justo en la primera línea
+                # después de la operación anterior.
+                if next_date is not None:
                     break
 
                 j += 1
@@ -933,7 +1288,7 @@ class TradeRepublicParser(BankParser):
             )
 
             # -----------------------------------------------------------
-            # Extraer todos los importes
+            # Extraer importes
             # -----------------------------------------------------------
 
             money_values: list[Decimal] = []
@@ -994,7 +1349,7 @@ class TradeRepublicParser(BankParser):
                     )
 
             # -----------------------------------------------------------
-            # Necesitamos al menos tipo/descripción
+            # Necesitamos tipo/descripción
             # -----------------------------------------------------------
 
             if not text_lines:
@@ -1037,17 +1392,8 @@ class TradeRepublicParser(BankParser):
             # -----------------------------------------------------------
             # Importe
             #
-            # En Trade Republic:
-            #
-            # primer importe = movimiento
-            # segundo importe = balance
-            #
-            # Ejemplo:
-            #
-            #     10,00 € 10,00 €
-            #
-            # primer 10 € = movimiento
-            # segundo 10 € = balance
+            # Primer importe = movimiento.
+            # Último importe = balance.
             # -----------------------------------------------------------
 
             movement_amount = money_values[0]
@@ -1078,18 +1424,6 @@ class TradeRepublicParser(BankParser):
 
                 tx_type = "FEE"
 
-            elif DEPOSIT_RE.search(combined):
-
-                tx_type = "TRANSFER"
-
-            elif WITHDRAWAL_RE.search(combined):
-
-                tx_type = "TRANSFER"
-
-            elif TRANSFER_RE.search(combined):
-
-                tx_type = "TRANSFER"
-
             elif CARD_RE.search(combined):
 
                 tx_type = "EXPENSE"
@@ -1106,9 +1440,22 @@ class TradeRepublicParser(BankParser):
             # Transferencia
             # -----------------------------------------------------------
 
-            is_transfer_hint = (
-                tx_type == "TRANSFER"
+            is_transfer_hint = bool(
+                DEPOSIT_RE.search(combined)
+                or WITHDRAWAL_RE.search(combined)
+                or TRANSFER_RE.search(combined)
             )
+
+            if (
+                tx_type == "UNKNOWN"
+                and is_transfer_hint
+            ):
+
+                if movement_amount > 0:
+                    tx_type = "INCOME"
+
+                elif movement_amount < 0:
+                    tx_type = "EXPENSE"
 
             # -----------------------------------------------------------
             # Activo
@@ -1126,13 +1473,7 @@ class TradeRepublicParser(BankParser):
                     asset = raw_description
 
             # -----------------------------------------------------------
-            # Guardamos el candidato y resolvemos el signo después usando
-            # la columna BALANCE.
-            #
-            # Trade Republic puede presentar:
-            #   72,99 € 937,01 €
-            # aunque 72,99 € sea una salida. El balance permite determinar
-            # que 937,01 - 1.010,00 = -72,99.
+            # Balance
             # -----------------------------------------------------------
 
             balance_value = (
@@ -1145,6 +1486,19 @@ class TradeRepublicParser(BankParser):
                 movement_amount
                 if movement_amount != 0
                 else Decimal("0")
+            )
+
+            logger.warning(
+                "TR_DEBUG CANDIDATE "
+                "line=%d date=%s movement=%s balance=%s "
+                "type=%s description=%r block_lines=%r",
+                i,
+                date_val,
+                movement_amount,
+                balance_value,
+                tx_type,
+                raw_description,
+                block_lines,
             )
 
             candidates.append({
@@ -1166,21 +1520,60 @@ class TradeRepublicParser(BankParser):
                     else None
                 ),
                 "is_transfer_hint": is_transfer_hint,
-                "extra": {"asset": asset} if asset else {},
+                "extra": (
+                    {"asset": asset}
+                    if asset
+                    else {}
+                ),
             })
 
             i = j
 
-        # Resolver todos los signos después de tener la secuencia de balances.
-        resolved_amounts = _resolve_trade_republic_amounts(candidates)
+        # ---------------------------------------------------------------
+        # Resolver signos
+        # ---------------------------------------------------------------
 
-        for candidate, resolved_amount in zip(candidates, resolved_amounts):
+        resolved_amounts = (
+            _resolve_trade_republic_amounts(
+                candidates
+            )
+        )
+
+        for candidate, resolved_amount in zip(
+            candidates,
+            resolved_amounts,
+        ):
+
             tx_type = candidate["type"]
 
-            # Si el documento no daba una dirección explícita, el signo
-            # resuelto determina ingreso/gasto.
+            # -----------------------------------------------------------
+            # Si el documento no daba dirección explícita, usar el signo
+            # resuelto por balance.
+            # -----------------------------------------------------------
+
             if tx_type == "UNKNOWN":
-                tx_type = "INCOME" if resolved_amount > 0 else "EXPENSE"
+
+                tx_type = (
+                    "INCOME"
+                    if resolved_amount > 0
+                    else "EXPENSE"
+                )
+
+            # -----------------------------------------------------------
+            # Coherencia final entre tipo y signo.
+            # -----------------------------------------------------------
+
+            if (
+                tx_type == "INCOME"
+                and resolved_amount < 0
+            ):
+                tx_type = "EXPENSE"
+
+            elif (
+                tx_type == "EXPENSE"
+                and resolved_amount > 0
+            ):
+                tx_type = "INCOME"
 
             transactions.append(
                 NormalizedTransaction(
@@ -1193,7 +1586,9 @@ class TradeRepublicParser(BankParser):
                     source=self.institution_key,
                     type=tx_type,
                     merchant=candidate["merchant"],
-                    is_transfer_hint=candidate["is_transfer_hint"],
+                    is_transfer_hint=candidate[
+                        "is_transfer_hint"
+                    ],
                     extra=candidate["extra"],
                 )
             )
@@ -1223,3 +1618,5 @@ class TradeRepublicParser(BankParser):
             errors,
             parsed_rows,
         )
+
+    

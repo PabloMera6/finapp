@@ -88,8 +88,16 @@ def test_trade_republic_uses_balance_to_resolve_positive_and_negative_movements(
         Decimal("-72.99"),
         Decimal("-12.35"),
     ]
+    # Las transferencias entrantes son dinero real y deben contabilizarse
+    # como ingreso (INCOME). Solo se excluyen del análisis si
+    # TransferDetector las confirma como transferencia entre cuentas
+    # propias del usuario (is_internal_transfer), lo cual es un paso
+    # posterior e independiente del parseo.
     assert [t.type for t in result.transactions] == [
-        "TRANSFER", "TRANSFER", "EXPENSE", "EXPENSE"
+        "INCOME", "INCOME", "EXPENSE", "EXPENSE"
+    ]
+    assert [t.is_transfer_hint for t in result.transactions] == [
+        True, True, False, False
     ]
 
 

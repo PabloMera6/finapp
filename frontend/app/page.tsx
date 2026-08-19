@@ -52,6 +52,37 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Igual que en /transactions y /analytics: sin esto, si el usuario añadía
+  // un movimiento manual y volvía al resumen, seguía viendo los datos
+  // antiguos porque nada disparaba una nueva carga. Recargamos en segundo
+  // plano (sin mostrar el loader) al recuperar el foco o la visibilidad.
+  useEffect(() => {
+    const reload = () => {
+      Promise.all([
+        api.get("/api/dashboard"),
+        api.get("/api/dashboard/timeseries?months=12"),
+        api.get("/api/insights"),
+        api.get("/api/bizums/unidentified"),
+      ]).then(([dash, ts, ins, bizums]) => {
+        setData(dash);
+        setSeries(ts);
+        setInsights(ins);
+        setBizumsPending(bizums.length);
+        setHasData(dash.income > 0 || dash.expenses > 0 || ts.some((p: TimeseriesPoint) => p.income || p.expenses));
+      }).catch(() => {});
+    };
+    const onFocus = () => reload();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") reload();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   if (loading) {
     return <div className="animate-pulse text-muted text-sm">Cargando resumen financiero...</div>;
   }
