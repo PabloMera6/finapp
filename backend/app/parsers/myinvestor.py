@@ -137,7 +137,7 @@ TRANSFER_RE = re.compile(
 # Estos movimientos son inversiones y deben tratarse como tal aunque no
 # contengan ninguna palabra clave de compra/venta explícita.
 INVESTMENT_FUND_RE = re.compile(
-    r"^\s*(VANGUARD|ISHARES|FIDELITY)\b",
+    r"^\s*(VANGUARD|ISHARES|FIDELITY|MSCI)\b",
     re.IGNORECASE,
 )
 
