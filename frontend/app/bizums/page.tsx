@@ -71,7 +71,7 @@ export default function BizumsPage() {
                     <div className="text-sm font-medium">{new Date(b.date).toLocaleDateString("es-ES")} — {b.description}</div>
                     <div className="text-xs text-muted">Destinatario: no identificado</div>
                   </div>
-                  <div className={`font-display font-semibold ${b.amount < 0 ? "text-negative" : "text-accent"}`}>
+                  <div className={`font-numeric font-semibold ${b.amount < 0 ? "text-negative" : "text-accent"}`}>
                     {formatCurrency(b.amount)}
                   </div>
                 </div>
@@ -80,12 +80,12 @@ export default function BizumsPage() {
                     placeholder="Destinatario (opcional)"
                     value={draft.recipient}
                     onChange={(e) => updateDraft(b.id, "recipient", e.target.value)}
-                    className="border border-border rounded-lg px-3 py-1.5 text-sm"
+                    className="input-field rounded-xl px-3 py-1.5 text-sm"
                   />
                   <select
                     value={draft.categoryId}
                     onChange={(e) => updateDraft(b.id, "categoryId", e.target.value)}
-                    className="border border-border rounded-lg px-3 py-1.5 text-sm"
+                    className="input-field rounded-xl px-3 py-1.5 text-sm"
                   >
                     <option value="">Tipo de gasto (opcional)</option>
                     {categories.map((c) => (
@@ -94,7 +94,7 @@ export default function BizumsPage() {
                   </select>
                   <button
                     onClick={() => save(b.id)}
-                    className="bg-accent text-white rounded-lg px-3 py-1.5 text-sm font-medium"
+                    className="btn-primary rounded-xl px-3 py-1.5 text-sm font-medium"
                   >
                     {draft.saved ? "Guardado ✓" : "Guardar"}
                   </button>

@@ -161,7 +161,7 @@ export default function AccountsPage() {
                     Saldo calculado:{" "}
                   </span>
 
-                  <span className="font-medium">
+                  <span className="font-numeric font-medium">
                     {a.calculated_balance !== null
                       ? formatCurrency(a.calculated_balance)
                       : "—"}

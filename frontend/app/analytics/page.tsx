@@ -36,7 +36,7 @@ const defaultRange = () => {
   };
 };
 
-const HEAT_COLORS = ["#F4F1EA", "#E8DFC8", "#D9C596", "#C9A227", "#B08A1E", "#8C6D17"];
+const HEAT_COLORS = ["#F5F3EC", "#EDE4CD", "#DFC79A", "#CBA562", "#B8823E", "#8C5F2A"];
 
 function heatColor(value: number, max: number): string {
   if (max <= 0) return HEAT_COLORS[0];
@@ -153,9 +153,9 @@ export default function AnalyticsPage() {
         <p className="text-sm text-muted">Consulta meses, años o cualquier periodo de hasta 10 años. Haz clic en un mes para ver sus movimientos.</p>
       </div>
       <div className="card p-4 flex flex-wrap gap-3 items-end">
-        <div><label className="text-xs text-muted">Desde</label><input type="month" value={from} onChange={(e) => setFrom(e.target.value)} className="block border border-border rounded-lg px-3 py-2 text-sm mt-1" /></div>
-        <div><label className="text-xs text-muted">Hasta</label><input type="month" value={to} onChange={(e) => setTo(e.target.value)} className="block border border-border rounded-lg px-3 py-2 text-sm mt-1" /></div>
-        <button onClick={() => run()} className="bg-accent text-white rounded-lg px-4 py-2 text-sm font-medium">Analizar</button>
+        <div><label className="text-xs text-muted">Desde</label><input type="month" value={from} onChange={(e) => setFrom(e.target.value)} className="block input-field rounded-xl px-3 py-2 text-sm mt-1" /></div>
+        <div><label className="text-xs text-muted">Hasta</label><input type="month" value={to} onChange={(e) => setTo(e.target.value)} className="block input-field rounded-xl px-3 py-2 text-sm mt-1" /></div>
+        <button onClick={() => run()} className="btn-primary rounded-xl px-4 py-2 text-sm font-medium">Analizar</button>
       </div>
       {projection && (
         <div className="card p-4">
@@ -205,7 +205,7 @@ export default function AnalyticsPage() {
         <div className="card p-4">
           <div className="text-sm font-medium mb-3">Evolución mensual</div>
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={data.monthly}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="month" /><YAxis /><Tooltip formatter={(v: number) => formatCurrency(v)} /><Line type="monotone" dataKey="income" name="Ingresos" stroke="#245A4C" /><Line type="monotone" dataKey="expenses" name="Gastos" stroke="#B94A34" /><Line type="monotone" dataKey="savings" name="Ahorro" stroke="#C9A227" /></LineChart>
+            <LineChart data={data.monthly}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="month" /><YAxis /><Tooltip formatter={(v: number) => formatCurrency(v)} /><Line type="monotone" dataKey="income" name="Ingresos" stroke="#1F5C46" /><Line type="monotone" dataKey="expenses" name="Gastos" stroke="#B3452F" /><Line type="monotone" dataKey="savings" name="Ahorro" stroke="#B8823E" /></LineChart>
           </ResponsiveContainer>
         </div>
 
@@ -273,7 +273,7 @@ export default function AnalyticsPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <div className="card p-4">
             <div className="text-sm font-medium mb-3">Ahorro por mes</div>
-            <ResponsiveContainer width="100%" height={230}><BarChart data={data.monthly}><XAxis dataKey="month" /><YAxis /><Tooltip formatter={(v: number) => formatCurrency(v)} /><Bar dataKey="savings" name="Ahorro" fill="#245A4C" /></BarChart></ResponsiveContainer>
+            <ResponsiveContainer width="100%" height={230}><BarChart data={data.monthly}><XAxis dataKey="month" /><YAxis /><Tooltip formatter={(v: number) => formatCurrency(v)} /><Bar dataKey="savings" name="Ahorro" fill="#1F5C46" /></BarChart></ResponsiveContainer>
           </div>
           <div className="card p-4">
             <div className="text-sm font-medium mb-3">Categorías de gasto</div>

@@ -8,7 +8,7 @@ import {
 import { api, formatCurrency } from "@/lib/api";
 import MetricCard from "@/components/MetricCard";
 
-const COLORS = ["#245A4C", "#B94A34", "#C9A227", "#4C7A9E", "#8B5FA3", "#5B665F", "#D98A4C", "#3E8E7E"];
+const COLORS = ["#1F5C46", "#B8823E", "#B3452F", "#4C7A9E", "#8B5FA3", "#63705F", "#D98A4C", "#3E8E7E"];
 
 type DashboardData = {
   month: string;
@@ -95,7 +95,7 @@ export default function DashboardPage() {
           Puedes exportar tus movimientos desde imagin, MyInvestor o Trade Republic.
           No necesitamos tus contraseñas bancarias.
         </p>
-        <a href="/import" className="inline-block bg-accent text-white rounded-lg px-4 py-2 text-sm font-medium">
+        <a href="/import" className="inline-block btn-primary rounded-xl px-4 py-2 text-sm font-medium">
           Importar movimientos
         </a>
       </div>
@@ -133,13 +133,13 @@ export default function DashboardPage() {
           <div className="text-sm font-medium mb-3">Ingresos vs. gastos (12 meses)</div>
           <ResponsiveContainer width="100%" height={240}>
             <LineChart data={series}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E3E6DE" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#E4E1D5" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => formatCurrency(v)} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="income" name="Ingresos" stroke="#245A4C" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="expenses" name="Gastos" stroke="#B94A34" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="income" name="Ingresos" stroke="#1F5C46" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="expenses" name="Gastos" stroke="#B3452F" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -171,11 +171,11 @@ export default function DashboardPage() {
         <div className="text-sm font-medium mb-3">Tasa de ahorro mensual</div>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={series.map((s) => ({ month: s.month, rate: s.income > 0 ? (s.savings / s.income) * 100 : 0 }))}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E3E6DE" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#E4E1D5" />
             <XAxis dataKey="month" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} unit="%" />
             <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} />
-            <Bar dataKey="rate" name="Tasa de ahorro" fill="#245A4C" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="rate" name="Tasa de ahorro" fill="#1F5C46" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

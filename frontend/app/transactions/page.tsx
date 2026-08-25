@@ -140,7 +140,7 @@ export default function TransactionsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="font-display text-xl font-semibold">Movimientos</h1>
         <div className="flex gap-2">
-          <button onClick={() => setShowAdd(true)} className="bg-accent text-white rounded-lg px-3 py-1.5 text-sm font-medium">+ Añadir</button>
+          <button onClick={() => setShowAdd(true)} className="btn-primary rounded-xl px-3 py-1.5 text-sm font-medium">+ Añadir</button>
         </div>
       </div>
 
@@ -152,7 +152,7 @@ export default function TransactionsPage() {
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && runFilters()}
             placeholder="Descripción..."
-            className="border border-border rounded-lg px-3 py-1.5 text-sm w-48"
+            className="input-field rounded-xl px-3 py-1.5 text-sm w-48"
           />
         </div>
         <div>
@@ -160,7 +160,7 @@ export default function TransactionsPage() {
           <select
             value={institutionFilter}
             onChange={(e) => setInstitutionFilter(e.target.value)}
-            className="border border-border rounded-lg px-3 py-1.5 text-sm"
+            className="input-field rounded-xl px-3 py-1.5 text-sm"
           >
             <option value="">Todas</option>
             {institutions.map((inst) => (
@@ -177,7 +177,7 @@ export default function TransactionsPage() {
             onChange={(e) => setAmountMin(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && runFilters()}
             placeholder="0"
-            className="border border-border rounded-lg px-3 py-1.5 text-sm w-28"
+            className="input-field rounded-xl px-3 py-1.5 text-sm w-28"
           />
         </div>
         <div>
@@ -189,10 +189,10 @@ export default function TransactionsPage() {
             onChange={(e) => setAmountMax(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && runFilters()}
             placeholder="9999"
-            className="border border-border rounded-lg px-3 py-1.5 text-sm w-28"
+            className="input-field rounded-xl px-3 py-1.5 text-sm w-28"
           />
         </div>
-        <button onClick={runFilters} className="border border-border rounded-lg px-3 py-1.5 text-sm">Filtrar</button>
+        <button onClick={runFilters} className="btn-secondary rounded-xl px-3 py-1.5 text-sm font-medium">Filtrar</button>
         {(search || institutionFilter || amountMin || amountMax) && (
           <button
             onClick={() => {
@@ -212,17 +212,17 @@ export default function TransactionsPage() {
         <div className="card p-4 space-y-3">
           <div className="text-sm font-medium">Nuevo movimiento</div>
           <div className="grid md:grid-cols-2 gap-3">
-            <select value={newTx.account_id} onChange={(e) => setNewTx({ ...newTx, account_id: e.target.value })} className="border border-border rounded-lg px-3 py-2 text-sm">
+            <select value={newTx.account_id} onChange={(e) => setNewTx({ ...newTx, account_id: e.target.value })} className="input-field rounded-xl px-3 py-2 text-sm">
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.account_name}</option>)}
             </select>
-            <input type="date" value={newTx.date} onChange={(e) => setNewTx({ ...newTx, date: e.target.value })} className="border border-border rounded-lg px-3 py-2 text-sm" />
-            <input type="number" step="0.01" value={newTx.amount} onChange={(e) => setNewTx({ ...newTx, amount: e.target.value })} placeholder="Importe" className="border border-border rounded-lg px-3 py-2 text-sm" />
-            <select value={newTx.type} onChange={(e) => setNewTx({ ...newTx, type: e.target.value })} className="border border-border rounded-lg px-3 py-2 text-sm">
+            <input type="date" value={newTx.date} onChange={(e) => setNewTx({ ...newTx, date: e.target.value })} className="input-field rounded-xl px-3 py-2 text-sm" />
+            <input type="number" step="0.01" value={newTx.amount} onChange={(e) => setNewTx({ ...newTx, amount: e.target.value })} placeholder="Importe" className="input-field rounded-xl px-3 py-2 text-sm" />
+            <select value={newTx.type} onChange={(e) => setNewTx({ ...newTx, type: e.target.value })} className="input-field rounded-xl px-3 py-2 text-sm">
               <option value="EXPENSE">Gasto</option><option value="INCOME">Ingreso</option><option value="TRANSFER">Transferencia</option><option value="INVESTMENT_BUY">Compra inversión</option><option value="INVESTMENT_SELL">Venta inversión</option><option value="DIVIDEND">Dividendo</option><option value="INTEREST">Intereses</option><option value="FEE">Comisión</option>
             </select>
           </div>
-          <input value={newTx.description} onChange={(e) => setNewTx({ ...newTx, description: e.target.value })} placeholder="Descripción" className="w-full border border-border rounded-lg px-3 py-2 text-sm" />
-          <div className="flex gap-2 justify-end"><button onClick={() => setShowAdd(false)} className="border border-border rounded-lg px-3 py-2 text-sm">Cancelar</button><button onClick={handleCreate} className="bg-accent text-white rounded-lg px-3 py-2 text-sm">Guardar</button></div>
+          <input value={newTx.description} onChange={(e) => setNewTx({ ...newTx, description: e.target.value })} placeholder="Descripción" className="w-full input-field rounded-xl px-3 py-2 text-sm" />
+          <div className="flex gap-2 justify-end"><button onClick={() => setShowAdd(false)} className="btn-secondary rounded-xl px-3 py-2 text-sm font-medium">Cancelar</button><button onClick={handleCreate} className="btn-primary rounded-xl px-3 py-2 text-sm font-semibold">Guardar</button></div>
         </div>
       )}
       {loading ? (
@@ -283,7 +283,7 @@ export default function TransactionsPage() {
               <button
                 disabled={page === 0}
                 onClick={() => goToPage(page - 1)}
-                className="border border-border rounded-lg px-3 py-1.5 text-sm disabled:opacity-40"
+                className="btn-secondary rounded-xl px-3 py-1.5 text-sm font-medium disabled:opacity-40"
               >
                 ← Anterior
               </button>
@@ -291,7 +291,7 @@ export default function TransactionsPage() {
               <button
                 disabled={page >= totalPages - 1}
                 onClick={() => goToPage(page + 1)}
-                className="border border-border rounded-lg px-3 py-1.5 text-sm disabled:opacity-40"
+                className="btn-secondary rounded-xl px-3 py-1.5 text-sm font-medium disabled:opacity-40"
               >
                 Siguiente →
               </button>

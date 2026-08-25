@@ -103,7 +103,7 @@ export default function ImportPage() {
           }`}
         >
           <p className="text-sm text-muted mb-3">Arrastra aquí tu archivo CSV, XLSX o PDF</p>
-          <label className="inline-block bg-accent text-white rounded-lg px-4 py-2 text-sm font-medium cursor-pointer">
+          <label className="inline-block btn-primary rounded-xl px-4 py-2 text-sm font-medium cursor-pointer">
             Seleccionar archivo
             <input
               type="file"
@@ -133,7 +133,7 @@ export default function ImportPage() {
               <select
                 value={preview.chosen_institution}
                 onChange={(e) => file && runPreview(file, e.target.value)}
-                className="border border-border rounded-lg px-3 py-1.5 text-sm"
+                className="input-field rounded-xl px-3 py-1.5 text-sm"
               >
                 {INSTITUTIONS.map((i) => (
                   <option key={i.key} value={i.key}>{i.label}</option>
@@ -161,7 +161,7 @@ export default function ImportPage() {
             <select
               value={accountChoice}
               onChange={(e) => setAccountChoice(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm mb-2"
+              className="w-full input-field rounded-xl px-3 py-2 text-sm mb-2"
             >
               <option value="new">Crear nueva cuenta</option>
               {preview.existing_accounts.map((a) => (
@@ -172,7 +172,7 @@ export default function ImportPage() {
               <input
                 value={newAccountName}
                 onChange={(e) => setNewAccountName(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm"
+                className="w-full input-field rounded-xl px-3 py-2 text-sm"
                 placeholder="Nombre de la cuenta"
               />
             )}
@@ -210,14 +210,14 @@ export default function ImportPage() {
           <div className="flex gap-3">
             <button
               onClick={() => { setPreview(null); setFile(null); }}
-              className="flex-1 border border-border rounded-lg py-2.5 text-sm font-medium"
+              className="flex-1 btn-secondary rounded-xl py-2.5 text-sm font-medium"
             >
               Cancelar
             </button>
             <button
               onClick={handleConfirm}
               disabled={loading || preview.new_rows === 0}
-              className="flex-1 bg-accent text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50"
+              className="flex-1 btn-primary rounded-xl py-2.5 text-sm font-medium disabled:opacity-50"
             >
               Confirmar importación
             </button>
@@ -231,7 +231,7 @@ export default function ImportPage() {
           <p className="text-sm text-muted mb-4">
             {result.imported} movimientos nuevos importados · {result.duplicates} duplicados descartados
           </p>
-          <button onClick={() => router.push("/")} className="bg-accent text-white rounded-lg px-4 py-2 text-sm font-medium">
+          <button onClick={() => router.push("/")} className="btn-primary rounded-xl px-4 py-2 text-sm font-medium">
             Ir al resumen
           </button>
         </div>

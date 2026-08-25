@@ -126,6 +126,21 @@ TRANSFER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# MyInvestor exporta muchas operaciones de fondos/ETFs directamente con el
+# nombre de la gestora al inicio del concepto (sin la palabra "compra"),
+# por ejemplo:
+#
+#   VANGUARD FTSE ALL-WORLD UCITS ETF
+#   ISHARES CORE MSCI WORLD
+#   FIDELITY INDEX WORLD FUND
+#
+# Estos movimientos son inversiones y deben tratarse como tal aunque no
+# contengan ninguna palabra clave de compra/venta explícita.
+INVESTMENT_FUND_RE = re.compile(
+    r"^\s*(VANGUARD|ISHARES|FIDELITY)\b",
+    re.IGNORECASE,
+)
+
 
 def _map_columns(columns: list[str]) -> dict[str, str]:
     normalized = {
@@ -330,6 +345,17 @@ class MyInvestorParser(BankParser):
             elif TRANSFER_RE.search(combined):
                 tx_type = "TRANSFER"
 
+            elif INVESTMENT_FUND_RE.search(raw_desc):
+                # Concepto es directamente el nombre de un fondo/ETF
+                # (VANGUARD/ISHARES/FIDELITY) sin palabra de compra/venta
+                # explícita. Se infiere la dirección por el signo del
+                # importe: dinero saliendo = compra, dinero entrando = venta.
+                tx_type = (
+                    "INVESTMENT_SELL"
+                    if amount_val > 0
+                    else "INVESTMENT_BUY"
+                )
+
             elif amount_val > 0:
                 tx_type = "INCOME"
 
@@ -337,6 +363,16 @@ class MyInvestorParser(BankParser):
                 tx_type = "EXPENSE"
 
             is_transfer_hint = tx_type == "TRANSFER"
+
+            # Activo (nombre del fondo/ETF) para operaciones de inversión.
+            merchant = None
+
+            if tx_type in {
+                "INVESTMENT_BUY",
+                "INVESTMENT_SELL",
+                "DIVIDEND",
+            }:
+                merchant = raw_desc
 
             currency = "EUR"
 
@@ -363,6 +399,7 @@ class MyInvestorParser(BankParser):
                     raw_description=raw_desc,
                     source=self.institution_key,
                     type=tx_type,
+                    merchant=merchant,
                     counterparty=counterparty,
                     is_transfer_hint=is_transfer_hint,
                 )

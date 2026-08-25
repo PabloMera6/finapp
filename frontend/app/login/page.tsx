@@ -29,7 +29,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="font-display text-2xl font-semibold text-ink">Finanzas</div>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent to-accentDeep flex items-center justify-center shadow-pop mx-auto mb-4">
+            <span className="text-white text-lg font-display font-bold">F</span>
+          </div>
+          <div className="font-display text-2xl font-semibold text-ink tracking-tight">Finanzas</div>
           <p className="text-sm text-muted mt-1">Tu análisis financiero personal, privado</p>
         </div>
 
@@ -41,7 +44,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+              className="input-field mt-1 w-full rounded-xl px-3 py-2.5 text-sm"
             />
           </div>
           <div>
@@ -51,16 +54,16 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+              className="input-field mt-1 w-full rounded-xl px-3 py-2.5 text-sm"
             />
           </div>
 
-          {error && <p className="text-xs text-negative">{error}</p>}
+          {error && <p className="text-xs text-negative font-medium">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-accent text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-60"
+            className="btn-primary w-full rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
           >
             {loading ? "Entrando..." : "Entrar"}
           </button>

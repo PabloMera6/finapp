@@ -46,7 +46,7 @@ export default function ComparePage() {
             type="month"
             value={`${a.year}-${String(a.month).padStart(2, "0")}`}
             onChange={(e) => { const [y, m] = e.target.value.split("-"); setA({ year: +y, month: +m }); }}
-            className="block border border-border rounded-lg px-3 py-1.5 text-sm mt-1"
+            className="block input-field rounded-xl px-3 py-1.5 text-sm mt-1"
           />
         </div>
         <div>
@@ -55,10 +55,10 @@ export default function ComparePage() {
             type="month"
             value={`${b.year}-${String(b.month).padStart(2, "0")}`}
             onChange={(e) => { const [y, m] = e.target.value.split("-"); setB({ year: +y, month: +m }); }}
-            className="block border border-border rounded-lg px-3 py-1.5 text-sm mt-1"
+            className="block input-field rounded-xl px-3 py-1.5 text-sm mt-1"
           />
         </div>
-        <button onClick={runCompare} className="bg-accent text-white rounded-lg px-4 py-2 text-sm font-medium">
+        <button onClick={runCompare} className="btn-primary rounded-xl px-4 py-2 text-sm font-medium">
           Comparar
         </button>
       </div>

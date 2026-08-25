@@ -550,6 +550,79 @@ CARD_RE = re.compile(
 
 
 # ---------------------------------------------------------------------------
+# Limpieza de coletillas de la descripción
+#
+# Trade Republic repite en la descripción, al inicio, palabras que ya
+# forman parte del "tipo" de la operación:
+#
+#   - Gastos con tarjeta:
+#       "Transacción con tarjeta" (tipo) + "tarjeta MEDIA MARKT..." (desc)
+#     dejando la descripción como "tarjeta MEDIA MARKT...".
+#
+#   - Compras/ventas de inversión:
+#       "Quantity: 0,1234 ISIN..." al inicio de la descripción del activo.
+#
+# Estas coletillas no aportan información (ya está representada por el
+# tipo de transacción) y deben eliminarse para dejar una descripción/activo
+# limpios.
+# ---------------------------------------------------------------------------
+
+CARD_DESCRIPTION_PREFIX_RE = re.compile(
+    r"""
+    ^\s*
+    (?:
+        transacci[oó]n\s+con\s+|
+        transaction\s+with\s+|
+        transaktion\s+mit\s+
+    )?
+    (?:tarjeta|card|karte)
+    \s+
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+QUANTITY_PREFIX_RE = re.compile(
+    r"""
+    ^\s*
+    (?:
+        buy|compra|sell|venta|
+        savings?\s*plan|plan\s+de\s+ahorro|ahorro|
+        dividend|dividendo
+    )?
+    \s*
+    (?:quantity|cantidad)
+    \s*:?\s*
+    [\d.,]*
+    \s*
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _strip_card_prefix(text: str) -> str:
+    """Quita la coletilla inicial 'tarjeta ' de descripciones de gastos."""
+
+    if not text:
+        return text
+
+    cleaned = CARD_DESCRIPTION_PREFIX_RE.sub("", text).strip()
+
+    return cleaned or text
+
+
+def _strip_quantity_prefix(text: str) -> str:
+    """Quita la coletilla inicial 'Quantity: ...' de activos de inversión."""
+
+    if not text:
+        return text
+
+    cleaned = QUANTITY_PREFIX_RE.sub("", text).strip()
+
+    return cleaned or text
+
+
+# ---------------------------------------------------------------------------
 # PDF
 # ---------------------------------------------------------------------------
 
@@ -1435,6 +1508,32 @@ class TradeRepublicParser(BankParser):
             elif movement_amount < 0:
 
                 tx_type = "EXPENSE"
+
+            # -----------------------------------------------------------
+            # Limpieza de coletillas
+            #
+            # - Gastos con tarjeta: quitar el "tarjeta " inicial repetido
+            #   en la descripción (ya representado por el tipo EXPENSE
+            #   y por CARD_RE).
+            # - Compras/ventas/dividendos: quitar el "Quantity: ..."
+            #   inicial repetido en la descripción del activo.
+            # -----------------------------------------------------------
+
+            if tx_type == "EXPENSE" and CARD_RE.search(combined):
+
+                raw_description = _strip_card_prefix(
+                    raw_description
+                )
+
+            elif tx_type in {
+                "INVESTMENT_BUY",
+                "INVESTMENT_SELL",
+                "DIVIDEND",
+            }:
+
+                raw_description = _strip_quantity_prefix(
+                    raw_description
+                )
 
             # -----------------------------------------------------------
             # Transferencia
