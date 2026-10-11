@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 
-const INSTITUTIONS = [
+const INSTITUTIONS = [\n  { key: "bbva", label: "BBVA" },
   { key: "imagin", label: "imagin" },
   { key: "myinvestor", label: "MyInvestor" },
   { key: "trade_republic", label: "Trade Republic" },
@@ -113,7 +113,7 @@ export default function ImportPage() {
             />
           </label>
           <p className="text-xs text-muted mt-6 leading-relaxed">
-            Exporta tus movimientos desde imagin, MyInvestor o Trade Republic. Trade Republic usa PDF.
+            Exporta tus movimientos desde BBVA, imagin, MyInvestor o Trade Republic. BBVA: Excel/CSV; Trade Republic: PDF.
             <br />No necesitamos tus contraseñas bancarias.
           </p>
         </div>

@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from app.parsers.imagin import ImaginParser
+from app.parsers.imagin import ImaginParser\nfrom app.parsers.bbva import BBVAParser
 from app.parsers.myinvestor import MyInvestorParser
 from app.parsers.trade_republic import TradeRepublicParser
 
@@ -109,3 +109,23 @@ def test_trade_republic_stops_at_balance_summary(monkeypatch):
     )
     result = parser.parse(b"%PDF-fake", "trade_republic_export.pdf")
     assert len(result.transactions) == 4
+
+
+
+def test_bbva_parses_exported_excel_style_csv():
+    csv = b"Fecha,F. Valor,Concepto,Movimiento,Importe,Divisa\\n01/10/2026,01/10/2026,NOMINA EMPRESA,Abono,2.100,00,EUR\\n"
+    # CSV locale values with comma decimal are normally quoted by spreadsheet exports;
+    # use a simple semicolon-delimited sample to avoid ambiguity in CSV quoting.
+    csv = "Fecha;F. Valor;Concepto;Movimiento;Importe;Divisa\\n01/10/2026;01/10/2026;NOMINA EMPRESA;Abono;2.100,00;EUR\\n".encode()
+    result = BBVAParser().parse(csv, "bbva_movimientos.csv")
+    assert result.institution == "bbva"
+    assert len(result.transactions) == 1
+    assert result.transactions[0].amount == Decimal("2100.00")
+    assert result.transactions[0].type == "INCOME"
+    assert result.transactions[0].value_date is not None
+
+
+def test_bbva_detects_common_headers():
+    parser = BBVAParser()
+    score = parser.detect("movimientos.xlsx", ["Fecha", "F. Valor", "Concepto", "Importe", "Divisa"], "")
+    assert score >= 0.4

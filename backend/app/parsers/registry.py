@@ -9,11 +9,11 @@ import io
 import pandas as pd
 
 from app.parsers.base import BankParser
-from app.parsers.imagin import ImaginParser
+from app.parsers.imagin import ImaginParser\nfrom app.parsers.bbva import BBVAParser
 from app.parsers.myinvestor import MyInvestorParser
 from app.parsers.trade_republic import TradeRepublicParser
 
-PARSERS: dict[str, BankParser] = {
+PARSERS: dict[str, BankParser] = {\n    "bbva": BBVAParser(),
     "imagin": ImaginParser(),
     "myinvestor": MyInvestorParser(),
     "trade_republic": TradeRepublicParser(),

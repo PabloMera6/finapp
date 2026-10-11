@@ -15,7 +15,7 @@ conocida de esta primera versión (sección 58).
 
 Los formatos soportados dependen del parser de cada entidad:
 
-  - imagin: CSV/XLSX
+  - BBVA: CSV/XLSX (exportación de movimientos)\n  - imagin: CSV/XLSX
   - MyInvestor: CSV/XLSX
   - Trade Republic: PDF
 
