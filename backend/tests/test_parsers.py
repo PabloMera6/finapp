@@ -1,6 +1,7 @@
 from decimal import Decimal
 
-from app.parsers.imagin import ImaginParser\nfrom app.parsers.bbva import BBVAParser
+from app.parsers.imagin import ImaginParser
+from app.parsers.bbva import BBVAParser
 from app.parsers.myinvestor import MyInvestorParser
 from app.parsers.trade_republic import TradeRepublicParser
 
@@ -129,3 +130,38 @@ def test_bbva_detects_common_headers():
     parser = BBVAParser()
     score = parser.detect("movimientos.xlsx", ["Fecha", "F. Valor", "Concepto", "Importe", "Divisa"], "")
     assert score >= 0.4
+
+
+def test_bbva_parses_real_excel_report_layout_with_title_rows():
+    """Formato BBVA: título y fecha del informe antes de la cabecera."""
+    from io import BytesIO
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Informe BBVA"
+    sheet.append([None] * 10)
+    sheet.append([None] * 10)
+    sheet.append([None, None, "Movements"])
+    sheet.append([None, None, "Report generation date: 11/10/2026"])
+    sheet.append([None, "Value date", "Date", "Reason", "Movement", "Amount", "Currency", "Available", "Currency", "Comments"])
+    sheet.append([None, "28/08/2026", "31/08/2026", "Bizum", "Recibido: sin concepto", 33.64, "EUR", 77.64, "EUR", ""])
+    sheet.append([None, "27/08/2026", "27/08/2026", "Bizum", "ENVIADO: Sin concepto", -0.50, "EUR", 10.00, "EUR", ""])
+    sheet.append([None, "27/08/2026", "27/08/2026", "Transfer received", "From pablo mera gomez", 10.00, "EUR", 10.00, "EUR", ""])
+
+    output = BytesIO()
+    workbook.save(output)
+    payload = output.getvalue()
+
+    result = BBVAParser().parse(payload, "exportacion.xlsx")
+    assert result.institution == "bbva"
+    assert result.total_rows == 3
+    assert len(result.errors) == 0
+    assert [tx.amount for tx in result.transactions] == [
+        Decimal("33.64"), Decimal("-0.50"), Decimal("10.00")
+    ]
+    assert result.transactions[0].date.strftime("%d/%m/%Y") == "31/08/2026"
+    assert result.transactions[0].value_date.strftime("%d/%m/%Y") == "28/08/2026"
+    assert result.transactions[0].is_bizum is True
+    assert result.transactions[1].bizum_direction == "SENT"
+    assert result.transactions[2].type == "INCOME"

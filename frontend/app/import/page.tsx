@@ -4,7 +4,8 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 
-const INSTITUTIONS = [\n  { key: "bbva", label: "BBVA" },
+const INSTITUTIONS = [
+  { key: "bbva", label: "BBVA" },
   { key: "imagin", label: "imagin" },
   { key: "myinvestor", label: "MyInvestor" },
   { key: "trade_republic", label: "Trade Republic" },

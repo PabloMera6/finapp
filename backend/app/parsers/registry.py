@@ -9,11 +9,13 @@ import io
 import pandas as pd
 
 from app.parsers.base import BankParser
-from app.parsers.imagin import ImaginParser\nfrom app.parsers.bbva import BBVAParser
+from app.parsers.imagin import ImaginParser
+from app.parsers.bbva import BBVAParser
 from app.parsers.myinvestor import MyInvestorParser
 from app.parsers.trade_republic import TradeRepublicParser
 
-PARSERS: dict[str, BankParser] = {\n    "bbva": BBVAParser(),
+PARSERS: dict[str, BankParser] = {
+    "bbva": BBVAParser(),
     "imagin": ImaginParser(),
     "myinvestor": MyInvestorParser(),
     "trade_republic": TradeRepublicParser(),
@@ -25,9 +27,22 @@ def detect_institution(file_bytes: bytes, filename: str) -> tuple[str | None, fl
     try:
         lower_name = filename.lower()
         if lower_name.endswith((".xlsx", ".xls")):
-            df_head = pd.read_excel(io.BytesIO(file_bytes), dtype=str, nrows=5)
-            header_row = list(df_head.columns)
-            sample_text = df_head.to_csv(index=False)
+            # BBVA's workbook has a title and report-generation date above
+            # the actual movements header. Search the first rows for it.
+            raw_head = pd.read_excel(io.BytesIO(file_bytes), dtype=str, header=None, nrows=30)
+            header_idx = None
+            for idx, row in raw_head.iterrows():
+                values = {str(v).strip().lower() for v in row.tolist() if pd.notna(v)}
+                if {"date", "amount", "value date"}.issubset(values):
+                    header_idx = idx
+                    break
+            if header_idx is not None:
+                header_row = [str(v) for v in raw_head.iloc[header_idx].tolist() if pd.notna(v)]
+                sample_text = raw_head.to_csv(index=False, header=False)
+            else:
+                df_head = pd.read_excel(io.BytesIO(file_bytes), dtype=str, nrows=5)
+                header_row = list(df_head.columns)
+                sample_text = df_head.to_csv(index=False)
         elif lower_name.endswith(".pdf"):
             # Para PDF no existe una fila CSV. Extraemos una pequeña muestra
             # de texto para que Trade Republic pueda detectarse aunque el
