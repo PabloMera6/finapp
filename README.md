@@ -1,7 +1,7 @@
 # Finanzas Personales
 
 Aplicación web privada de análisis financiero personal a partir de exportaciones
-de movimientos de **imagin**, **MyInvestor** y **Trade Republic**.
+de movimientos de **imagin**, **BBVA**, **MyInvestor** y **Trade Republic**.
 
 No solicita ni almacena credenciales bancarias. Funciona exclusivamente con
 archivos (CSV/XLSX) que tú mismo exportas desde cada entidad.
@@ -10,7 +10,7 @@ archivos (CSV/XLSX) que tú mismo exportas desde cada entidad.
 
 ## 1. Qué incluye esta versión
 
-- Importación de CSV/XLSX de imagin y MyInvestor y PDF de Trade Republic, con
+- Importación de CSV/XLSX de imagin, BBVA y MyInvestor y PDF de Trade Republic, con
   detección automática de entidad.
 - Normalización a un modelo común (`NormalizedTransaction`).
 - Deduplicación por huella (reimportar un archivo no duplica movimientos).
